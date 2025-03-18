@@ -5,6 +5,10 @@
 #include "vert.h"
 #include "frag.h"
 
+#define HEIGHT 600
+#define WIDTH 800
+#define MAX_FRAMES_IN_FLIGHT 2
+
 class VulkanRenderer {
 private:
     GLFWwindow* m_window;
@@ -16,11 +20,16 @@ private:
     vk::SwapchainKHR m_swapchain;
     std::vector<vk::Image> m_swapchainImages;
     std::vector<vk::ImageView> m_swapchainImageViews;
+    vk::RenderPass m_renderPass;
+    vk::PipelineLayout m_pipelineLayout;
     vk::Pipeline m_graphicsPipeline;
+    std::vector<vk::Framebuffer> m_framebuffers;
+    vk::CommandPool m_commandPool;
+    vk::CommandBuffer m_commandBuffer[MAX_FRAMES_IN_FLIGHT];
     void initWindow(){
         glfwInit();
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-        m_window = glfwCreateWindow(800, 600, "Vulkan Window", nullptr, nullptr);
+        m_window = glfwCreateWindow(WIDTH, HEIGHT, "Vulkan Window", nullptr, nullptr);
     };
     void createInstance(){
         vk::ApplicationInfo appInfo("VulkanApp", 1, "No Engine", 1, VK_API_VERSION_1_2);
@@ -78,7 +87,94 @@ private:
             m_swapchainImageViews.push_back(m_device.createImageView(createInfo));
         }
     };
+    void createRenderPass(){
+        vk::AttachmentDescription attachmentDescription{};
+        attachmentDescription.format = vk::Format::eB8G8R8A8Srgb;
+        attachmentDescription.samples = vk::SampleCountFlagBits::e1;
+        attachmentDescription.loadOp = vk::AttachmentLoadOp::eClear;
+        attachmentDescription.storeOp = vk::AttachmentStoreOp::eStore;
+        attachmentDescription.stencilLoadOp = vk::AttachmentLoadOp::eDontCare;
+        attachmentDescription.stencilStoreOp = vk::AttachmentStoreOp::eDontCare;
+        attachmentDescription.initialLayout = vk::ImageLayout::eUndefined;
+        attachmentDescription.finalLayout = vk::ImageLayout::ePresentSrcKHR;
+        vk::AttachmentReference colorAttachmentRef(0, vk::ImageLayout::eColorAttachmentOptimal);
+        vk::SubpassDescription subpassDescription({}, vk::PipelineBindPoint::eGraphics, 0, nullptr, 1, &colorAttachmentRef, nullptr, nullptr, 0, nullptr);
+        vk::SubpassDependency dependency(VK_SUBPASS_EXTERNAL, 0, vk::PipelineStageFlagBits::eColorAttachmentOutput, vk::PipelineStageFlagBits::eColorAttachmentOutput, {}, vk::AccessFlagBits::eColorAttachmentWrite, vk::DependencyFlagBits::eByRegion);
+        vk::RenderPassCreateInfo createInfo({}, 1, &attachmentDescription, 1, &subpassDescription, 1, &dependency);
+        m_renderPass = m_device.createRenderPass(createInfo);
+    }
     void createGraphicsPipeline(){
+        vk::ShaderModuleCreateInfo vertShaderCreateInfo{};
+        vertShaderCreateInfo.codeSize = sizeof(vert_spv);
+        vertShaderCreateInfo.pCode = reinterpret_cast<const uint32_t*>(vert_spv);
+        vk::ShaderModule vertShaderModule = m_device.createShaderModule(vertShaderCreateInfo);
+        vk::ShaderModuleCreateInfo fragShaderCreateInfo{};
+        fragShaderCreateInfo.codeSize = sizeof(frag_spv);
+        fragShaderCreateInfo.pCode = reinterpret_cast<const uint32_t*>(frag_spv);
+        vk::ShaderModule fragShaderModule = m_device.createShaderModule(fragShaderCreateInfo);
+        vk::PipelineShaderStageCreateInfo vertShaderStageInfo({}, vk::ShaderStageFlagBits::eVertex, vertShaderModule, "main");
+        vk::PipelineShaderStageCreateInfo fragShaderStageInfo({}, vk::ShaderStageFlagBits::eFragment, fragShaderModule, "main");
+        vk::PipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
+        vk::VertexInputBindingDescription bindingDescription{};
+        bindingDescription.binding = 0;
+        bindingDescription.stride = sizeof(float)*2;
+        bindingDescription.inputRate = vk::VertexInputRate::eVertex;
+        vk::VertexInputAttributeDescription attributeDescription{};
+        attributeDescription.binding = 0;
+        attributeDescription.location = 0;
+        attributeDescription.format = vk::Format::eR32G32Sfloat;
+        attributeDescription.offset = 0;
+        vk::PipelineVertexInputStateCreateInfo vertexInputInfo{};
+        vertexInputInfo.vertexBindingDescriptionCount = 1;
+        vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
+        vertexInputInfo.vertexAttributeDescriptionCount = 1;
+        vertexInputInfo.pVertexAttributeDescriptions = &attributeDescription;
+        vk::PipelineInputAssemblyStateCreateInfo inputAssemblyInfo({}, vk::PrimitiveTopology::eTriangleList, VK_FALSE);
+        vk::Viewport viewport(0.0f, 0.0f, WIDTH, HEIGHT, 0.0f, 1.0f);
+        vk::Rect2D scissor({0, 0}, {WIDTH, HEIGHT});
+        vk::PipelineViewportStateCreateInfo viewportStateInfo({}, 1, &viewport, 1, &scissor);
+        vk::PipelineRasterizationStateCreateInfo rasterizerInfo({}, VK_FALSE, VK_FALSE, vk::PolygonMode::eFill, vk::CullModeFlagBits::eNone, vk::FrontFace::eCounterClockwise, VK_FALSE, 0.0f, 0.0f, 0.0f, 1.0f);
+        vk::PipelineMultisampleStateCreateInfo multisamplingInfo;
+        vk::PipelineColorBlendAttachmentState colorBlendAttachment{};
+        colorBlendAttachment.colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
+        colorBlendAttachment.blendEnable = VK_FALSE;
+        vk::PipelineColorBlendStateCreateInfo colorBlendingInfo({}, VK_FALSE, vk::LogicOp::eCopy, 1, &colorBlendAttachment);
+        vk::PipelineLayoutCreateInfo pipelineLayoutInfo;
+        m_pipelineLayout = m_device.createPipelineLayout(pipelineLayoutInfo);
+        vk::GraphicsPipelineCreateInfo pipelineInfo{};
+        pipelineInfo.stageCount = 2;
+        pipelineInfo.pStages = shaderStages;
+        pipelineInfo.pVertexInputState = &vertexInputInfo;
+        pipelineInfo.pInputAssemblyState = &inputAssemblyInfo;
+        pipelineInfo.pViewportState = &viewportStateInfo;
+        pipelineInfo.pRasterizationState = &rasterizerInfo;
+        pipelineInfo.pMultisampleState = &multisamplingInfo;
+        pipelineInfo.pColorBlendState = &colorBlendingInfo;
+        pipelineInfo.layout = m_pipelineLayout;
+        pipelineInfo.renderPass = m_renderPass;
+        pipelineInfo.subpass = 0;
+        m_graphicsPipeline = m_device.createGraphicsPipeline({}, pipelineInfo).value;
+        m_device.destroyShaderModule(vertShaderModule);
+        m_device.destroyShaderModule(fragShaderModule);
+    };
+    void createFramebuffers(){
+        for(const auto& imageView: m_swapchainImageViews){
+            vk::FramebufferCreateInfo createInfo({}, m_renderPass, 1, &imageView, WIDTH, HEIGHT, 1);
+            m_framebuffers.push_back(m_device.createFramebuffer(createInfo));
+        }
+    };
+    void createCommandPool(){
+        vk::CommandPoolCreateInfo createInfo{};
+        createInfo.queueFamilyIndex = 0;
+        createInfo.flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer;
+        m_commandPool = m_device.createCommandPool(createInfo);
+    };
+    void createCommandBuffers(){
+        vk::CommandBufferAllocateInfo allocateInfo(m_commandPool, vk::CommandBufferLevel::ePrimary, MAX_FRAMES_IN_FLIGHT);
+        std::vector<vk::CommandBuffer> buffers =  m_device.allocateCommandBuffers(allocateInfo);
+        for(int i=0; i<MAX_FRAMES_IN_FLIGHT; i++){
+            m_commandBuffer[i] = buffers[i];
+        }
     };
 
 public:
@@ -90,10 +186,23 @@ public:
         createSurface();
         createSwapchain();
         createImageViews();
+        createRenderPass();
         createGraphicsPipeline();
+        createFramebuffers();
+        createCommandPool();
+        createCommandBuffers();
     };
     ~VulkanRenderer(){
+        for(int i=0; i<MAX_FRAMES_IN_FLIGHT; i++){
+            m_device.freeCommandBuffers(m_commandPool, m_commandBuffer[i]);
+        }
+        m_device.destroyCommandPool(m_commandPool);
+        for(const auto& framebuffer: m_framebuffers){
+            m_device.destroyFramebuffer(framebuffer);
+        }
         m_device.destroyPipeline(m_graphicsPipeline);
+        m_device.destroyPipelineLayout(m_pipelineLayout);
+        m_device.destroyRenderPass(m_renderPass);
         for(const auto& imageView: m_swapchainImageViews){
             m_device.destroyImageView(imageView);
         }
