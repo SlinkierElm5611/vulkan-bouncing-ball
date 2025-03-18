@@ -17,12 +17,22 @@ add_custom_target(shaders
     BYPRODUCTS vert.spv frag.spv comp.spv
 )
 
+set(SHADER_HEADERS vert.h frag.h comp.h)
+
+add_custom_target(shaders_headers
+    COMMAND xxd -i vert.spv > vert.h
+    COMMAND xxd -i frag.spv > frag.h
+    COMMAND xxd -i comp.spv > comp.h
+    DEPENDS shaders
+    BYPRODUCTS vert.h frag.h comp.h
+)
+
 find_package(glfw3 REQUIRED)
 
 find_package(Vulkan REQUIRED)
 
-add_executable(bouncing_ball main.cpp)
+add_executable(bouncing_ball main.cpp ${SHADER_HEADERS})
 
-add_dependencies(bouncing_ball glfw Vulkan::Vulkan shaders)
+add_dependencies(bouncing_ball glfw Vulkan::Vulkan shaders_headers)
 
 target_link_libraries(bouncing_ball glfw Vulkan::Vulkan)

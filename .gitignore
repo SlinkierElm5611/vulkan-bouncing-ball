@@ -13,3 +13,6 @@ CMakeUserPresets.json
 .cache
 *.spv
 bouncing_ball
+vert.h
+frag.h
+comp.h
