@@ -11,6 +11,7 @@
 
 class VulkanRenderer {
 private:
+    uint8_t m_currentFrame = 0;
     GLFWwindow* m_window;
     vk::Instance m_instance;
     vk::PhysicalDevice m_physicalDevice;
@@ -26,6 +27,13 @@ private:
     std::vector<vk::Framebuffer> m_framebuffers;
     vk::CommandPool m_commandPool;
     vk::CommandBuffer m_commandBuffer[MAX_FRAMES_IN_FLIGHT];
+    vk::Semaphore m_imageAvailableSemaphores[MAX_FRAMES_IN_FLIGHT];
+    vk::Semaphore m_renderFinishedSemaphores[MAX_FRAMES_IN_FLIGHT];
+    vk::Fence m_inFlightFences[MAX_FRAMES_IN_FLIGHT];
+    vk::Buffer m_vertexBuffer;
+    vk::DeviceMemory m_vertexBufferMemory;
+    vk::Buffer m_stagingBuffer;
+    vk::DeviceMemory m_stagingBufferMemory;
     void initWindow(){
         glfwInit();
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
@@ -176,6 +184,15 @@ private:
             m_commandBuffer[i] = buffers[i];
         }
     };
+    void createSyncObjects(){
+        vk::SemaphoreCreateInfo semaphoreInfo{};
+        vk::FenceCreateInfo fenceInfo{vk::FenceCreateFlagBits::eSignaled};
+        for(int i=0; i<MAX_FRAMES_IN_FLIGHT; i++){
+            m_imageAvailableSemaphores[i] = m_device.createSemaphore(semaphoreInfo);
+            m_renderFinishedSemaphores[i] = m_device.createSemaphore(semaphoreInfo);
+            m_inFlightFences[i] = m_device.createFence(fenceInfo);
+        }
+    };
 
 public:
     VulkanRenderer(){
@@ -191,8 +208,14 @@ public:
         createFramebuffers();
         createCommandPool();
         createCommandBuffers();
+        createSyncObjects();
     };
     ~VulkanRenderer(){
+        for(int i=0; i<MAX_FRAMES_IN_FLIGHT; i++){
+            m_device.destroySemaphore(m_imageAvailableSemaphores[i]);
+            m_device.destroySemaphore(m_renderFinishedSemaphores[i]);
+            m_device.destroyFence(m_inFlightFences[i]);
+        }
         for(int i=0; i<MAX_FRAMES_IN_FLIGHT; i++){
             m_device.freeCommandBuffers(m_commandPool, m_commandBuffer[i]);
         }
