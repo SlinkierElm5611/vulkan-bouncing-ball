@@ -40,6 +40,7 @@ private:
     VmaAllocation m_instanceBufferAllocations[MAX_FRAMES_IN_FLIGHT];
     vk::Buffer m_stagingBuffers[MAX_FRAMES_IN_FLIGHT];
     VmaAllocation m_stagingBufferAllocations[MAX_FRAMES_IN_FLIGHT];
+    void * m_mappedStagingBuffers[MAX_FRAMES_IN_FLIGHT];
     void initWindow(){
         glfwInit();
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
@@ -207,6 +208,37 @@ private:
             m_inFlightFences[i] = m_device.createFence(fenceInfo);
         }
     };
+    void createVertexBuffers(){
+        VmaAllocationCreateInfo allocInfo{};
+        allocInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
+        vk::BufferCreateInfo bufferInfo{};
+        bufferInfo.size = sizeof(float)*52;
+        bufferInfo.usage = vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst;
+        for(int i=0; i<MAX_FRAMES_IN_FLIGHT; i++){
+            vmaCreateBuffer(m_allocator, reinterpret_cast<VkBufferCreateInfo*>(&bufferInfo), &allocInfo, reinterpret_cast<VkBuffer*>(&m_vertexBuffers[i]), &m_vertexBufferAllocations[i], nullptr);
+        }
+    };
+    void createInstanceBuffers(){
+        VmaAllocationCreateInfo allocInfo{};
+        allocInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
+        vk::BufferCreateInfo bufferInfo{};
+        bufferInfo.size = sizeof(float)*2;
+        bufferInfo.usage = vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst;
+        for(int i=0; i<MAX_FRAMES_IN_FLIGHT; i++){
+            vmaCreateBuffer(m_allocator, reinterpret_cast<VkBufferCreateInfo*>(&bufferInfo), &allocInfo, reinterpret_cast<VkBuffer*>(&m_instanceBuffers[i]), &m_instanceBufferAllocations[i], nullptr);
+        }
+    };
+    void createStagingBuffers(){
+        VmaAllocationCreateInfo allocInfo{};
+        allocInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_HOST;
+        vk::BufferCreateInfo bufferInfo{};
+        bufferInfo.size = sizeof(float)*54;
+        bufferInfo.usage = vk::BufferUsageFlagBits::eTransferSrc;
+        for(int i=0; i<MAX_FRAMES_IN_FLIGHT; i++){
+            vmaCreateBuffer(m_allocator, reinterpret_cast<VkBufferCreateInfo*>(&bufferInfo), &allocInfo, reinterpret_cast<VkBuffer*>(&m_stagingBuffers[i]), &m_stagingBufferAllocations[i], nullptr);
+            vmaMapMemory(m_allocator, m_stagingBufferAllocations[i], &m_mappedStagingBuffers[i]);
+        }
+    };
 
 public:
     VulkanRenderer(){
@@ -224,14 +256,19 @@ public:
         createCommandPool();
         createCommandBuffers();
         createSyncObjects();
+        createVertexBuffers();
+        createInstanceBuffers();
+        createStagingBuffers();
     };
     ~VulkanRenderer(){
         for(int i=0; i<MAX_FRAMES_IN_FLIGHT; i++){
+            vmaUnmapMemory(m_allocator, m_stagingBufferAllocations[i]);
+            vmaDestroyBuffer(m_allocator, m_stagingBuffers[i], m_stagingBufferAllocations[i]);
+            vmaDestroyBuffer(m_allocator, m_instanceBuffers[i], m_instanceBufferAllocations[i]);
+            vmaDestroyBuffer(m_allocator, m_vertexBuffers[i], m_vertexBufferAllocations[i]);
             m_device.destroySemaphore(m_imageAvailableSemaphores[i]);
             m_device.destroySemaphore(m_renderFinishedSemaphores[i]);
             m_device.destroyFence(m_inFlightFences[i]);
-        }
-        for(int i=0; i<MAX_FRAMES_IN_FLIGHT; i++){
             m_device.freeCommandBuffers(m_commandPool, m_commandBuffer[i]);
         }
         m_device.destroyCommandPool(m_commandPool);
