@@ -1,3 +1,6 @@
+#define VMA_IMPLEMENTATION
+#define VMA_VULKAN_VERSION 1002000
+#include <vk_mem_alloc.h>
 #include <vulkan/vulkan.hpp>
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -16,6 +19,7 @@ private:
     vk::Instance m_instance;
     vk::PhysicalDevice m_physicalDevice;
     vk::Device m_device;
+    VmaAllocator m_allocator;
     vk::Queue m_queue;
     vk::SurfaceKHR m_surface;
     vk::SwapchainKHR m_swapchain;
@@ -30,10 +34,12 @@ private:
     vk::Semaphore m_imageAvailableSemaphores[MAX_FRAMES_IN_FLIGHT];
     vk::Semaphore m_renderFinishedSemaphores[MAX_FRAMES_IN_FLIGHT];
     vk::Fence m_inFlightFences[MAX_FRAMES_IN_FLIGHT];
-    vk::Buffer m_vertexBuffer;
-    vk::DeviceMemory m_vertexBufferMemory;
-    vk::Buffer m_stagingBuffer;
-    vk::DeviceMemory m_stagingBufferMemory;
+    vk::Buffer m_vertexBuffers[MAX_FRAMES_IN_FLIGHT];
+    VmaAllocation m_vertexBufferAllocations[MAX_FRAMES_IN_FLIGHT];
+    vk::Buffer m_instanceBuffers[MAX_FRAMES_IN_FLIGHT];
+    VmaAllocation m_instanceBufferAllocations[MAX_FRAMES_IN_FLIGHT];
+    vk::Buffer m_stagingBuffers[MAX_FRAMES_IN_FLIGHT];
+    VmaAllocation m_stagingBufferAllocations[MAX_FRAMES_IN_FLIGHT];
     void initWindow(){
         glfwInit();
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
@@ -72,6 +78,14 @@ private:
         createInfo.ppEnabledExtensionNames = deviceExtensions.data();
         m_device = m_physicalDevice.createDevice(createInfo);
         m_queue = m_device.getQueue(0, 0);
+    };
+    void createAllocator(){
+        VmaAllocatorCreateInfo allocatorInfo{};
+        allocatorInfo.physicalDevice = m_physicalDevice;
+        allocatorInfo.device = m_device;
+        allocatorInfo.instance = m_instance;
+        allocatorInfo.vulkanApiVersion = VK_API_VERSION_1_2;
+        vmaCreateAllocator(&allocatorInfo, &m_allocator);
     };
     void createSurface(){
         VkSurfaceKHR surface;
@@ -200,6 +214,7 @@ public:
         createInstance();
         createPhysicalDevice();
         createLogicalDevice();
+        createAllocator();
         createSurface();
         createSwapchain();
         createImageViews();
@@ -231,6 +246,7 @@ public:
         }
         m_device.destroySwapchainKHR(m_swapchain);
         m_instance.destroySurfaceKHR(m_surface);
+        vmaDestroyAllocator(m_allocator);
         m_device.destroy();
         m_instance.destroy();
         glfwDestroyWindow(m_window);

@@ -31,8 +31,10 @@ find_package(glfw3 REQUIRED)
 
 find_package(Vulkan REQUIRED)
 
+add_subdirectory(VulkanMemoryAllocator)
+
 add_executable(bouncing_ball main.cpp ${SHADER_HEADERS})
 
 add_dependencies(bouncing_ball glfw Vulkan::Vulkan shaders_headers)
 
-target_link_libraries(bouncing_ball glfw Vulkan::Vulkan)
+target_link_libraries(bouncing_ball glfw Vulkan::Vulkan GPUOpen::VulkanMemoryAllocator)
