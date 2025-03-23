@@ -7,6 +7,8 @@
 #include "vert.h"
 #include <GLFW/glfw3.h>
 #include <vector>
+#include <cmath>
+#include <iostream>
 
 #define HEIGHT 600
 #define WIDTH 800
@@ -43,6 +45,8 @@ private:
   vk::Buffer m_stagingBuffers[MAX_FRAMES_IN_FLIGHT];
   VmaAllocation m_stagingBufferAllocations[MAX_FRAMES_IN_FLIGHT];
   void *m_mappedStagingBuffers[MAX_FRAMES_IN_FLIGHT];
+  float m_vertices[54];
+  uint8_t m_indices[78];
   void initWindow() {
     glfwInit();
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
@@ -268,7 +272,7 @@ private:
     VmaAllocationCreateInfo allocInfo{};
     allocInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
     vk::BufferCreateInfo bufferInfo{};
-    bufferInfo.size = sizeof(float) * 52;
+    bufferInfo.size = sizeof(float) * 54;
     bufferInfo.usage = vk::BufferUsageFlagBits::eVertexBuffer |
                        vk::BufferUsageFlagBits::eTransferDst;
     for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
@@ -309,6 +313,21 @@ private:
       m_mappedStagingBuffers[i] = info.pMappedData;
     }
   };
+  void generateVertices(){
+      for (uint32_t i = 0; i < 26; i++) {
+        m_vertices[2*i] = std::cos(2 * M_PI * i / 26);
+        m_vertices[2*i+1] = std::sin(2 * M_PI * i / 26);
+      }
+      m_vertices[52] = 0.0f;
+      m_vertices[53] = 0.0f;
+  };
+  void generateIndices(){
+      for(uint32_t i = 0; i < 26; i++){
+          m_indices[3*i] = i;
+          m_indices[3*i+1] = (i+1)%26;
+          m_indices[3*i+2] = 26;
+      }
+  };
 
 public:
   VulkanRenderer() {
@@ -329,6 +348,8 @@ public:
     createVertexBuffers();
     createInstanceBuffers();
     createStagingBuffers();
+    generateVertices();
+    generateIndices();
   };
   ~VulkanRenderer() {
     for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
