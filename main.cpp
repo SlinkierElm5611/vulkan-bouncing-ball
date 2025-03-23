@@ -231,6 +231,7 @@ private:
     void createStagingBuffers(){
         VmaAllocationCreateInfo allocInfo{};
         allocInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_HOST;
+        allocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
         vk::BufferCreateInfo bufferInfo{};
         bufferInfo.size = sizeof(float)*54;
         bufferInfo.usage = vk::BufferUsageFlagBits::eTransferSrc;
