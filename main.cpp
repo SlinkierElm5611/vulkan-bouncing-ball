@@ -236,8 +236,9 @@ private:
         bufferInfo.size = sizeof(float)*54;
         bufferInfo.usage = vk::BufferUsageFlagBits::eTransferSrc;
         for(int i=0; i<MAX_FRAMES_IN_FLIGHT; i++){
-            vmaCreateBuffer(m_allocator, reinterpret_cast<VkBufferCreateInfo*>(&bufferInfo), &allocInfo, reinterpret_cast<VkBuffer*>(&m_stagingBuffers[i]), &m_stagingBufferAllocations[i], nullptr);
-            vmaMapMemory(m_allocator, m_stagingBufferAllocations[i], &m_mappedStagingBuffers[i]);
+            VmaAllocationInfo info;
+            vmaCreateBuffer(m_allocator, reinterpret_cast<VkBufferCreateInfo*>(&bufferInfo), &allocInfo, reinterpret_cast<VkBuffer*>(&m_stagingBuffers[i]), &m_stagingBufferAllocations[i], &info);
+            m_mappedStagingBuffers[i] = info.pMappedData;
         }
     };
 
@@ -263,7 +264,6 @@ public:
     };
     ~VulkanRenderer(){
         for(int i=0; i<MAX_FRAMES_IN_FLIGHT; i++){
-            vmaUnmapMemory(m_allocator, m_stagingBufferAllocations[i]);
             vmaDestroyBuffer(m_allocator, m_stagingBuffers[i], m_stagingBufferAllocations[i]);
             vmaDestroyBuffer(m_allocator, m_instanceBuffers[i], m_instanceBufferAllocations[i]);
             vmaDestroyBuffer(m_allocator, m_vertexBuffers[i], m_vertexBufferAllocations[i]);
