@@ -8,7 +8,6 @@
 #include <GLFW/glfw3.h>
 #include <vector>
 #include <cmath>
-#include <iostream>
 
 #define HEIGHT 600
 #define WIDTH 800
@@ -282,6 +281,20 @@ private:
           &m_vertexBufferAllocations[i], nullptr);
     }
   };
+  void createIndexBuffers() {
+    VmaAllocationCreateInfo allocInfo{};
+    allocInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
+    vk::BufferCreateInfo bufferInfo{};
+    bufferInfo.size = sizeof(uint8_t) * 78;
+    bufferInfo.usage = vk::BufferUsageFlagBits::eIndexBuffer |
+                       vk::BufferUsageFlagBits::eTransferDst;
+    for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+      vmaCreateBuffer(
+          m_allocator, reinterpret_cast<VkBufferCreateInfo *>(&bufferInfo),
+          &allocInfo, reinterpret_cast<VkBuffer *>(&m_indexBuffers[i]),
+          &m_indexBufferAllocations[i], nullptr);
+    }
+  };
   void createInstanceBuffers() {
     VmaAllocationCreateInfo allocInfo{};
     allocInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
@@ -328,6 +341,44 @@ private:
           m_indices[3*i+2] = 26;
       }
   };
+  void transferVertexBuffers(){
+      m_commandBuffer[m_currentFrame].begin({vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
+      for(int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++){
+          memcpy(m_mappedStagingBuffers[i], m_vertices, sizeof(float)*54);
+          vk::BufferCopy copyRegion(0, 0, sizeof(float)*54);
+          m_commandBuffer[m_currentFrame].copyBuffer(m_stagingBuffers[i], m_vertexBuffers[i], copyRegion);
+      }
+      m_commandBuffer[m_currentFrame].end();
+      vk::SubmitInfo submitInfo{};
+      submitInfo.commandBufferCount = 1;
+      submitInfo.pCommandBuffers = &m_commandBuffer[m_currentFrame];
+      submitInfo.signalSemaphoreCount = 0;
+      submitInfo.waitSemaphoreCount = 0;
+      submitInfo.pWaitSemaphores = nullptr;
+      submitInfo.pSignalSemaphores = nullptr;
+      submitInfo.pWaitDstStageMask = nullptr;
+      m_queue.submit(submitInfo, nullptr);
+      m_queue.waitIdle();
+  };
+  void transferIndexBuffers(){
+      m_commandBuffer[m_currentFrame].begin({vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
+      for(int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++){
+          memcpy(m_mappedStagingBuffers[i], m_indices, sizeof(uint8_t)*78);
+          vk::BufferCopy copyRegion(0, 0, sizeof(uint8_t)*78);
+          m_commandBuffer[m_currentFrame].copyBuffer(m_stagingBuffers[i], m_indexBuffers[i], copyRegion);
+      }
+      m_commandBuffer[m_currentFrame].end();
+      vk::SubmitInfo submitInfo{};
+      submitInfo.commandBufferCount = 1;
+      submitInfo.pCommandBuffers = &m_commandBuffer[m_currentFrame];
+      submitInfo.signalSemaphoreCount = 0;
+      submitInfo.waitSemaphoreCount = 0;
+      submitInfo.pWaitSemaphores = nullptr;
+      submitInfo.pSignalSemaphores = nullptr;
+      submitInfo.pWaitDstStageMask = nullptr;
+      m_queue.submit(submitInfo, nullptr);
+      m_queue.waitIdle();
+  };
 
 public:
   VulkanRenderer() {
@@ -346,10 +397,13 @@ public:
     createCommandBuffers();
     createSyncObjects();
     createVertexBuffers();
+    createIndexBuffers();
     createInstanceBuffers();
     createStagingBuffers();
     generateVertices();
     generateIndices();
+    transferVertexBuffers();
+    transferIndexBuffers();
   };
   ~VulkanRenderer() {
     for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
@@ -357,6 +411,8 @@ public:
                        m_stagingBufferAllocations[i]);
       vmaDestroyBuffer(m_allocator, m_instanceBuffers[i],
                        m_instanceBufferAllocations[i]);
+      vmaDestroyBuffer(m_allocator, m_indexBuffers[i],
+                       m_indexBufferAllocations[i]);
       vmaDestroyBuffer(m_allocator, m_vertexBuffers[i],
                        m_vertexBufferAllocations[i]);
       m_device.destroySemaphore(m_imageAvailableSemaphores[i]);
