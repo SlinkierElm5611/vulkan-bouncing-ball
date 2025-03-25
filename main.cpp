@@ -9,7 +9,6 @@
 #include <vector>
 #include <cmath>
 #include <chrono>
-//#include <iostream>
 
 #define HEIGHT 600
 #define WIDTH 800
@@ -47,10 +46,11 @@ private:
   VmaAllocation m_stagingBufferAllocations[MAX_FRAMES_IN_FLIGHT];
   void *m_mappedStagingBuffers[MAX_FRAMES_IN_FLIGHT];
   float m_vertices[54];
-  uint8_t m_indices[78];
+  uint32_t m_indices[78];
   void initWindow() {
     glfwInit();
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+    glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
     m_window =
         glfwCreateWindow(WIDTH, HEIGHT, "Vulkan Window", nullptr, nullptr);
   };
@@ -118,7 +118,7 @@ private:
         m_physicalDevice.getSurfaceCapabilitiesKHR(m_surface);
     vk::SurfaceFormatKHR surfaceFormat = vk::Format::eB8G8R8A8Srgb;
     vk::PresentModeKHR presentMode = vk::PresentModeKHR::eFifo;
-    vk::Extent2D extent = surfaceCapabilities.currentExtent;
+    vk::Extent2D extent = vk::Extent2D{WIDTH, HEIGHT};
     vk::SwapchainCreateInfoKHR createInfo(
         {}, m_surface, surfaceCapabilities.minImageCount, surfaceFormat.format,
         surfaceFormat.colorSpace, extent, 1,
@@ -287,7 +287,7 @@ private:
     VmaAllocationCreateInfo allocInfo{};
     allocInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
     vk::BufferCreateInfo bufferInfo{};
-    bufferInfo.size = sizeof(uint8_t) * 78;
+    bufferInfo.size = sizeof(uint32_t) * 78;
     bufferInfo.usage = vk::BufferUsageFlagBits::eIndexBuffer |
                        vk::BufferUsageFlagBits::eTransferDst;
     for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
@@ -408,6 +408,7 @@ public:
     transferIndexBuffers();
   };
   ~VulkanRenderer() {
+      m_device.waitIdle();
     for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
       vmaDestroyBuffer(m_allocator, m_stagingBuffers[i],
                        m_stagingBufferAllocations[i]);
@@ -441,7 +442,56 @@ public:
     glfwTerminate();
   };
   bool shouldQuit() { return glfwWindowShouldClose(m_window); };
-  void drawFrame(float* instanceData) {
+  void uploadInstanceData(float* data, uint32_t instanceCount){
+      float* currentStagingBuffer = reinterpret_cast<float*>(m_mappedStagingBuffers[m_currentFrame]);
+      memcpy(currentStagingBuffer, data, sizeof(float)*3*instanceCount);
+      vk::BufferCopy copyRegion(0,0,sizeof(float)*3*instanceCount);
+      m_commandBuffer[m_currentFrame].copyBuffer(m_stagingBuffers[m_currentFrame], m_instanceBuffers[m_currentFrame], copyRegion);
+      vk::MemoryBarrier barrier(vk::AccessFlagBits::eTransferWrite, vk::AccessFlagBits::eVertexAttributeRead);
+      vk::BufferMemoryBarrier bufferBarrier(vk::AccessFlagBits::eTransferWrite, vk::AccessFlagBits::eVertexAttributeRead, VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED, m_instanceBuffers[m_currentFrame], 0, VK_WHOLE_SIZE);
+      m_commandBuffer[m_currentFrame].pipelineBarrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eVertexInput, {}, barrier, bufferBarrier, {});
+  }
+  void drawFrame(float* instanceData, uint32_t instanceCount = 1) {
+      m_device.waitForFences(1, &m_inFlightFences[m_currentFrame], VK_TRUE, UINT64_MAX);
+      m_device.resetFences(1, &m_inFlightFences[m_currentFrame]);
+      uint32_t imageIndex = m_device.acquireNextImageKHR(m_swapchain, UINT64_MAX, m_imageAvailableSemaphores[m_currentFrame]).value;
+      m_commandBuffer[m_currentFrame].begin({vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
+      uploadInstanceData(instanceData, instanceCount);
+      vk::ClearValue clearValue{};
+      clearValue.color = {0.0f, 0.0f, 0.0f, 1.0f};
+      vk::RenderPassBeginInfo renderPassBeginInfo{};
+      renderPassBeginInfo.clearValueCount = 1;
+      renderPassBeginInfo.pClearValues = &clearValue;
+      renderPassBeginInfo.framebuffer = m_framebuffers[imageIndex];
+      renderPassBeginInfo.renderArea = vk::Rect2D{{0,0}, {WIDTH, HEIGHT}};
+      renderPassBeginInfo.renderPass = m_renderPass;
+      m_commandBuffer[m_currentFrame].beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
+      m_commandBuffer[m_currentFrame].bindPipeline(vk::PipelineBindPoint::eGraphics, m_graphicsPipeline);
+      m_commandBuffer[m_currentFrame].bindVertexBuffers(0, m_vertexBuffers[m_currentFrame], {0});
+      m_commandBuffer[m_currentFrame].bindIndexBuffer(m_indexBuffers[m_currentFrame], 0, vk::IndexType::eUint32);
+      m_commandBuffer[m_currentFrame].bindVertexBuffers(1, m_instanceBuffers[m_currentFrame], {0});
+      m_commandBuffer[m_currentFrame].drawIndexed(78, instanceCount, 0, 0, 0);
+      m_commandBuffer[m_currentFrame].endRenderPass();
+      m_commandBuffer[m_currentFrame].end();
+      vk::SubmitInfo submitInfo{};
+      submitInfo.commandBufferCount = 1;
+      submitInfo.pCommandBuffers = &m_commandBuffer[m_currentFrame];
+      submitInfo.signalSemaphoreCount = 1;
+      submitInfo.pSignalSemaphores = &m_renderFinishedSemaphores[m_currentFrame];
+      submitInfo.waitSemaphoreCount = 1;
+      submitInfo.pWaitSemaphores = &m_imageAvailableSemaphores[m_currentFrame];
+      vk::PipelineStageFlags waitStages[] = {vk::PipelineStageFlagBits::eColorAttachmentOutput};
+      submitInfo.pWaitDstStageMask = waitStages;
+      m_queue.submit(submitInfo, m_inFlightFences[m_currentFrame]);
+      vk::PresentInfoKHR presentInfo{};
+      presentInfo.waitSemaphoreCount = 1;
+      presentInfo.pWaitSemaphores = &m_renderFinishedSemaphores[m_currentFrame];
+      presentInfo.swapchainCount = 1;
+      presentInfo.pSwapchains = &m_swapchain;
+      presentInfo.pImageIndices = &imageIndex;
+      presentInfo.pResults = nullptr;
+      m_queue.presentKHR(presentInfo);
+      m_currentFrame = (m_currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
   };
 };
 
@@ -468,7 +518,7 @@ class BouncingBall{
         auto currentTime = std::chrono::high_resolution_clock::now();
         auto dt = std::chrono::duration<float>(currentTime - m_lastTime).count();
         m_instanceData[0] += m_vx * dt;
-        m_instanceData[1] += m_vy * dt;
+        m_instanceData[1] -= m_vy * dt;
         m_vy -= GRAVITY * dt;
         m_lastTime = currentTime;
         if(m_instanceData[0] + m_instanceData[2] > 1.0){
@@ -487,17 +537,12 @@ class BouncingBall{
             m_vy = -m_vy;
             m_instanceData[1] = -1.0 + m_instanceData[2];
         }
-        //std::cout<<"Position: ";
-        //std::cout<<m_instanceData[0]<<" "<<m_instanceData[1]<<std::endl;
-        //std::cout<<"Velocity: ";
-        //std::cout<<m_vx<<" "<<m_vy<<std::endl;
-        //std::cout<<dt<<std::endl;
     };
 };
 
 int main() {
   VulkanRenderer app;
-  BouncingBall ball(0.5, 0.5, 0.1, 0.1, 0.1);
+  BouncingBall ball(0, 0, 0.1, 0.1, 0.25);
   while (!app.shouldQuit()) {
     glfwPollEvents();
     app.drawFrame(ball.getInstanceData());
