@@ -467,9 +467,8 @@ public:
       renderPassBeginInfo.renderPass = m_renderPass;
       m_commandBuffer[m_currentFrame].beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
       m_commandBuffer[m_currentFrame].bindPipeline(vk::PipelineBindPoint::eGraphics, m_graphicsPipeline);
-      m_commandBuffer[m_currentFrame].bindVertexBuffers(0, m_vertexBuffers[m_currentFrame], {0});
+      m_commandBuffer[m_currentFrame].bindVertexBuffers(0, {m_vertexBuffers[m_currentFrame], m_instanceBuffers[m_currentFrame]}, {0, 0});
       m_commandBuffer[m_currentFrame].bindIndexBuffer(m_indexBuffers[m_currentFrame], 0, vk::IndexType::eUint32);
-      m_commandBuffer[m_currentFrame].bindVertexBuffers(1, m_instanceBuffers[m_currentFrame], {0});
       m_commandBuffer[m_currentFrame].drawIndexed(78, instanceCount, 0, 0, 0);
       m_commandBuffer[m_currentFrame].endRenderPass();
       m_commandBuffer[m_currentFrame].end();
@@ -542,7 +541,7 @@ class BouncingBall{
 
 int main() {
   VulkanRenderer app;
-  BouncingBall ball(0, 0, 0.1, 0.1, 0.25);
+  BouncingBall ball(0, 0, 0.1, 0.2, 0.25);
   while (!app.shouldQuit()) {
     glfwPollEvents();
     app.drawFrame(ball.getInstanceData());
