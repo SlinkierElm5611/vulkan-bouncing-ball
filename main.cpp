@@ -11,8 +11,8 @@
 #include <chrono>
 
 #define HEIGHT 600
-#define WIDTH 800
-#define MAX_FRAMES_IN_FLIGHT 2
+#define WIDTH 600
+#define MAX_FRAMES_IN_FLIGHT 10
 
 class VulkanRenderer {
 private:
