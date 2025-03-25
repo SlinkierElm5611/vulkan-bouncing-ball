@@ -8,6 +8,8 @@
 #include <GLFW/glfw3.h>
 #include <vector>
 #include <cmath>
+#include <chrono>
+//#include <iostream>
 
 #define HEIGHT 600
 #define WIDTH 800
@@ -183,7 +185,7 @@ private:
     bindingDescription[0].stride = sizeof(float) * 2;
     bindingDescription[0].inputRate = vk::VertexInputRate::eVertex;
     bindingDescription[1].binding = 1;
-    bindingDescription[1].stride = sizeof(float) * 2;
+    bindingDescription[1].stride = sizeof(float) * 3;
     bindingDescription[1].inputRate = vk::VertexInputRate::eInstance;
     vk::VertexInputAttributeDescription attributeDescription[2];
     attributeDescription[0].binding = 0;
@@ -192,7 +194,7 @@ private:
     attributeDescription[0].offset = 0;
     attributeDescription[1].binding = 1;
     attributeDescription[1].location = 1;
-    attributeDescription[1].format = vk::Format::eR32G32Sfloat;
+    attributeDescription[1].format = vk::Format::eR32G32B32Sfloat;
     attributeDescription[1].offset = 0;
     vk::PipelineVertexInputStateCreateInfo vertexInputInfo{};
     vertexInputInfo.vertexBindingDescriptionCount = 2;
@@ -299,7 +301,7 @@ private:
     VmaAllocationCreateInfo allocInfo{};
     allocInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
     vk::BufferCreateInfo bufferInfo{};
-    bufferInfo.size = sizeof(float) * 2;
+    bufferInfo.size = sizeof(float) * 3;
     bufferInfo.usage = vk::BufferUsageFlagBits::eVertexBuffer |
                        vk::BufferUsageFlagBits::eTransferDst;
     for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
@@ -438,15 +440,68 @@ public:
     glfwDestroyWindow(m_window);
     glfwTerminate();
   };
-  void run() {
-    while (!glfwWindowShouldClose(m_window)) {
-      glfwPollEvents();
-    }
+  bool shouldQuit() { return glfwWindowShouldClose(m_window); };
+  void drawFrame(float* instanceData) {
   };
+};
+
+class BouncingBall{
+    private:
+    const float GRAVITY = 0.1;
+    float m_vx;
+    float m_vy;
+    float m_instanceData[3];
+    std::chrono::time_point<std::chrono::high_resolution_clock> m_lastTime;
+    public:
+    BouncingBall(float x, float y, float vx, float vy, float radius){
+        m_instanceData[0] = x;
+        m_instanceData[1] = y;
+        m_instanceData[2] = radius;
+        m_vx = vx;
+        m_vy = vy;
+        m_lastTime = std::chrono::high_resolution_clock::now();
+    };
+    float* getInstanceData(){
+        return m_instanceData;
+    };
+    void update(){
+        auto currentTime = std::chrono::high_resolution_clock::now();
+        auto dt = std::chrono::duration<float>(currentTime - m_lastTime).count();
+        m_instanceData[0] += m_vx * dt;
+        m_instanceData[1] += m_vy * dt;
+        m_vy -= GRAVITY * dt;
+        m_lastTime = currentTime;
+        if(m_instanceData[0] + m_instanceData[2] > 1.0){
+            m_vx = -m_vx;
+            m_instanceData[0] = 1.0 - m_instanceData[2];
+        }
+        if(m_instanceData[0] - m_instanceData[2] < -1.0){
+            m_vx = -m_vx;
+            m_instanceData[0] = -1.0 + m_instanceData[2];
+        }
+        if(m_instanceData[1] + m_instanceData[2] > 1.0){
+            m_vy = -m_vy;
+            m_instanceData[1] = 1.0 - m_instanceData[2];
+        }
+        if(m_instanceData[1] - m_instanceData[2] < -1.0){
+            m_vy = -m_vy;
+            m_instanceData[1] = -1.0 + m_instanceData[2];
+        }
+        //std::cout<<"Position: ";
+        //std::cout<<m_instanceData[0]<<" "<<m_instanceData[1]<<std::endl;
+        //std::cout<<"Velocity: ";
+        //std::cout<<m_vx<<" "<<m_vy<<std::endl;
+        //std::cout<<dt<<std::endl;
+    };
 };
 
 int main() {
   VulkanRenderer app;
-  app.run();
+  BouncingBall ball(0.5, 0.5, 0.1, 0.1, 0.1);
+  while (!app.shouldQuit()) {
+    glfwPollEvents();
+    app.drawFrame(ball.getInstanceData());
+    ball.update();
+  }
   return 0;
 }
