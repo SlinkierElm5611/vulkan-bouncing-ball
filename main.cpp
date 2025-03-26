@@ -317,7 +317,7 @@ private:
     allocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT |
                       VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
     vk::BufferCreateInfo bufferInfo{};
-    bufferInfo.size = sizeof(float) * 54;
+    bufferInfo.size = sizeof(uint32_t) * 78;
     bufferInfo.usage = vk::BufferUsageFlagBits::eTransferSrc;
     for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
       VmaAllocationInfo info;
@@ -329,17 +329,17 @@ private:
     }
   };
   void generateVertices(){
-      for (uint32_t i = 0; i < 26; i++) {
-        m_vertices[2*i] = std::cos(2 * M_PI * i / 26);
-        m_vertices[2*i+1] = std::sin(2 * M_PI * i / 26);
+      for (uint32_t i = 0; i < 25; i++) {
+        m_vertices[2*i] = std::cos(2 * M_PI * i / 25);
+        m_vertices[2*i+1] = std::sin(2 * M_PI * i / 25);
       }
       m_vertices[52] = 0.0f;
       m_vertices[53] = 0.0f;
   };
   void generateIndices(){
-      for(uint32_t i = 0; i < 26; i++){
+      for(uint32_t i = 0; i < 25; i++){
           m_indices[3*i] = i;
-          m_indices[3*i+1] = (i+1)%26;
+          m_indices[3*i+1] = (i+1)%25;
           m_indices[3*i+2] = 26;
       }
   };
@@ -365,8 +365,8 @@ private:
   void transferIndexBuffers(){
       m_commandBuffer[m_currentFrame].begin({vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
       for(int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++){
-          memcpy(m_mappedStagingBuffers[i], m_indices, sizeof(uint8_t)*78);
-          vk::BufferCopy copyRegion(0, 0, sizeof(uint8_t)*78);
+          memcpy(m_mappedStagingBuffers[i], m_indices, sizeof(uint32_t)*78);
+          vk::BufferCopy copyRegion(0, 0, sizeof(uint32_t)*78);
           m_commandBuffer[m_currentFrame].copyBuffer(m_stagingBuffers[i], m_indexBuffers[i], copyRegion);
       }
       m_commandBuffer[m_currentFrame].end();
@@ -496,7 +496,7 @@ public:
 
 class BouncingBall{
     private:
-    const float GRAVITY = 0.1;
+    const float GRAVITY = 0.5;
     float m_vx;
     float m_vy;
     float m_instanceData[3];
@@ -541,7 +541,7 @@ class BouncingBall{
 
 int main() {
   VulkanRenderer app;
-  BouncingBall ball(0, 0, 0.1, 0.2, 0.25);
+  BouncingBall ball(0, 0, 0.1, 0.2, 0.2);
   while (!app.shouldQuit()) {
     glfwPollEvents();
     app.drawFrame(ball.getInstanceData());
