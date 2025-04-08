@@ -87,8 +87,21 @@ private:
   void createLogicalDevice() {
     float queuePriority = 1.0f;
     vk::DeviceQueueCreateInfo queueCreateInfo({}, 0, 1, &queuePriority);
-    std::vector<const char *> deviceExtensions = {
-        VK_KHR_SWAPCHAIN_EXTENSION_NAME, "VK_KHR_portability_subset"};
+    std::vector<const char *> deviceExtensions;
+    std::vector<vk::ExtensionProperties> supportedExtensions = m_physicalDevice.enumerateDeviceExtensionProperties();
+    for (const auto &extension : {
+        VK_KHR_SWAPCHAIN_EXTENSION_NAME, "VK_KHR_portability_subset"}){
+        bool found = false;
+        for (const auto &supportedExtension : supportedExtensions) {
+            if (strcmp(extension, supportedExtension.extensionName) == 0) {
+                found = true;
+                break;
+            }
+        }
+        if (found) {
+            deviceExtensions.push_back(extension);
+        }
+    }
     vk::DeviceCreateInfo createInfo{};
     createInfo.queueCreateInfoCount = 1;
     createInfo.pQueueCreateInfos = &queueCreateInfo;
