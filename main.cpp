@@ -6,9 +6,9 @@
 #include "frag.h"
 #include "vert.h"
 #include <GLFW/glfw3.h>
-#include <vector>
-#include <cmath>
 #include <chrono>
+#include <cmath>
+#include <vector>
 
 #define HEIGHT 1000
 #define WIDTH 1000
@@ -88,19 +88,20 @@ private:
     float queuePriority = 1.0f;
     vk::DeviceQueueCreateInfo queueCreateInfo({}, 0, 1, &queuePriority);
     std::vector<const char *> deviceExtensions;
-    std::vector<vk::ExtensionProperties> supportedExtensions = m_physicalDevice.enumerateDeviceExtensionProperties();
-    for (const auto &extension : {
-        VK_KHR_SWAPCHAIN_EXTENSION_NAME, "VK_KHR_portability_subset"}){
-        bool found = false;
-        for (const auto &supportedExtension : supportedExtensions) {
-            if (strcmp(extension, supportedExtension.extensionName) == 0) {
-                found = true;
-                break;
-            }
+    std::vector<vk::ExtensionProperties> supportedExtensions =
+        m_physicalDevice.enumerateDeviceExtensionProperties();
+    for (const auto &extension :
+         {VK_KHR_SWAPCHAIN_EXTENSION_NAME, "VK_KHR_portability_subset"}) {
+      bool found = false;
+      for (const auto &supportedExtension : supportedExtensions) {
+        if (strcmp(extension, supportedExtension.extensionName) == 0) {
+          found = true;
+          break;
         }
-        if (found) {
-            deviceExtensions.push_back(extension);
-        }
+      }
+      if (found) {
+        deviceExtensions.push_back(extension);
+      }
     }
     vk::DeviceCreateInfo createInfo{};
     createInfo.queueCreateInfoCount = 1;
@@ -341,58 +342,62 @@ private:
       m_mappedStagingBuffers[i] = info.pMappedData;
     }
   };
-  void generateVertices(){
-      for (uint32_t i = 0; i < 25; i++) {
-        m_vertices[2*i] = std::cos(2 * M_PI * i / 25);
-        m_vertices[2*i+1] = std::sin(2 * M_PI * i / 25);
-      }
-      m_vertices[52] = 0.0f;
-      m_vertices[53] = 0.0f;
+  void generateVertices() {
+    for (uint32_t i = 0; i < 25; i++) {
+      m_vertices[2 * i] = std::cos(2 * M_PI * i / 25);
+      m_vertices[2 * i + 1] = std::sin(2 * M_PI * i / 25);
+    }
+    m_vertices[52] = 0.0f;
+    m_vertices[53] = 0.0f;
   };
-  void generateIndices(){
-      for(uint32_t i = 0; i < 25; i++){
-          m_indices[3*i] = i;
-          m_indices[3*i+1] = (i+1)%25;
-          m_indices[3*i+2] = 26;
-      }
+  void generateIndices() {
+    for (uint32_t i = 0; i < 25; i++) {
+      m_indices[3 * i] = i;
+      m_indices[3 * i + 1] = (i + 1) % 25;
+      m_indices[3 * i + 2] = 26;
+    }
   };
-  void transferVertexBuffers(){
-      m_commandBuffer[m_currentFrame].begin({vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
-      for(int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++){
-          memcpy(m_mappedStagingBuffers[i], m_vertices, sizeof(float)*54);
-          vk::BufferCopy copyRegion(0, 0, sizeof(float)*54);
-          m_commandBuffer[m_currentFrame].copyBuffer(m_stagingBuffers[i], m_vertexBuffers[i], copyRegion);
-      }
-      m_commandBuffer[m_currentFrame].end();
-      vk::SubmitInfo submitInfo{};
-      submitInfo.commandBufferCount = 1;
-      submitInfo.pCommandBuffers = &m_commandBuffer[m_currentFrame];
-      submitInfo.signalSemaphoreCount = 0;
-      submitInfo.waitSemaphoreCount = 0;
-      submitInfo.pWaitSemaphores = nullptr;
-      submitInfo.pSignalSemaphores = nullptr;
-      submitInfo.pWaitDstStageMask = nullptr;
-      m_queue.submit(submitInfo, nullptr);
-      m_queue.waitIdle();
+  void transferVertexBuffers() {
+    m_commandBuffer[m_currentFrame].begin(
+        {vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
+    for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+      memcpy(m_mappedStagingBuffers[i], m_vertices, sizeof(float) * 54);
+      vk::BufferCopy copyRegion(0, 0, sizeof(float) * 54);
+      m_commandBuffer[m_currentFrame].copyBuffer(
+          m_stagingBuffers[i], m_vertexBuffers[i], copyRegion);
+    }
+    m_commandBuffer[m_currentFrame].end();
+    vk::SubmitInfo submitInfo{};
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &m_commandBuffer[m_currentFrame];
+    submitInfo.signalSemaphoreCount = 0;
+    submitInfo.waitSemaphoreCount = 0;
+    submitInfo.pWaitSemaphores = nullptr;
+    submitInfo.pSignalSemaphores = nullptr;
+    submitInfo.pWaitDstStageMask = nullptr;
+    m_queue.submit(submitInfo, nullptr);
+    m_queue.waitIdle();
   };
-  void transferIndexBuffers(){
-      m_commandBuffer[m_currentFrame].begin({vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
-      for(int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++){
-          memcpy(m_mappedStagingBuffers[i], m_indices, sizeof(uint32_t)*78);
-          vk::BufferCopy copyRegion(0, 0, sizeof(uint32_t)*78);
-          m_commandBuffer[m_currentFrame].copyBuffer(m_stagingBuffers[i], m_indexBuffers[i], copyRegion);
-      }
-      m_commandBuffer[m_currentFrame].end();
-      vk::SubmitInfo submitInfo{};
-      submitInfo.commandBufferCount = 1;
-      submitInfo.pCommandBuffers = &m_commandBuffer[m_currentFrame];
-      submitInfo.signalSemaphoreCount = 0;
-      submitInfo.waitSemaphoreCount = 0;
-      submitInfo.pWaitSemaphores = nullptr;
-      submitInfo.pSignalSemaphores = nullptr;
-      submitInfo.pWaitDstStageMask = nullptr;
-      m_queue.submit(submitInfo, nullptr);
-      m_queue.waitIdle();
+  void transferIndexBuffers() {
+    m_commandBuffer[m_currentFrame].begin(
+        {vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
+    for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+      memcpy(m_mappedStagingBuffers[i], m_indices, sizeof(uint32_t) * 78);
+      vk::BufferCopy copyRegion(0, 0, sizeof(uint32_t) * 78);
+      m_commandBuffer[m_currentFrame].copyBuffer(m_stagingBuffers[i],
+                                                 m_indexBuffers[i], copyRegion);
+    }
+    m_commandBuffer[m_currentFrame].end();
+    vk::SubmitInfo submitInfo{};
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &m_commandBuffer[m_currentFrame];
+    submitInfo.signalSemaphoreCount = 0;
+    submitInfo.waitSemaphoreCount = 0;
+    submitInfo.pWaitSemaphores = nullptr;
+    submitInfo.pSignalSemaphores = nullptr;
+    submitInfo.pWaitDstStageMask = nullptr;
+    m_queue.submit(submitInfo, nullptr);
+    m_queue.waitIdle();
   };
 
 public:
@@ -421,7 +426,7 @@ public:
     transferIndexBuffers();
   };
   ~VulkanRenderer() {
-      m_device.waitIdle();
+    m_device.waitIdle();
     for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
       vmaDestroyBuffer(m_allocator, m_stagingBuffers[i],
                        m_stagingBufferAllocations[i]);
@@ -455,101 +460,123 @@ public:
     glfwTerminate();
   };
   bool shouldQuit() { return glfwWindowShouldClose(m_window); };
-  void uploadInstanceData(float* data, uint32_t instanceCount){
-      float* currentStagingBuffer = reinterpret_cast<float*>(m_mappedStagingBuffers[m_currentFrame]);
-      memcpy(currentStagingBuffer, data, sizeof(float)*3*instanceCount);
-      vk::BufferCopy copyRegion(0,0,sizeof(float)*3*instanceCount);
-      m_commandBuffer[m_currentFrame].copyBuffer(m_stagingBuffers[m_currentFrame], m_instanceBuffers[m_currentFrame], copyRegion);
-      vk::MemoryBarrier barrier(vk::AccessFlagBits::eTransferWrite, vk::AccessFlagBits::eVertexAttributeRead);
-      vk::BufferMemoryBarrier bufferBarrier(vk::AccessFlagBits::eTransferWrite, vk::AccessFlagBits::eVertexAttributeRead, VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED, m_instanceBuffers[m_currentFrame], 0, VK_WHOLE_SIZE);
-      m_commandBuffer[m_currentFrame].pipelineBarrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eVertexInput, {}, barrier, bufferBarrier, {});
+  void uploadInstanceData(float *data, uint32_t instanceCount) {
+    float *currentStagingBuffer =
+        reinterpret_cast<float *>(m_mappedStagingBuffers[m_currentFrame]);
+    memcpy(currentStagingBuffer, data, sizeof(float) * 3 * instanceCount);
+    vk::BufferCopy copyRegion(0, 0, sizeof(float) * 3 * instanceCount);
+    m_commandBuffer[m_currentFrame].copyBuffer(
+        m_stagingBuffers[m_currentFrame], m_instanceBuffers[m_currentFrame],
+        copyRegion);
+    vk::MemoryBarrier barrier(vk::AccessFlagBits::eTransferWrite,
+                              vk::AccessFlagBits::eVertexAttributeRead);
+    vk::BufferMemoryBarrier bufferBarrier(
+        vk::AccessFlagBits::eTransferWrite,
+        vk::AccessFlagBits::eVertexAttributeRead, VK_QUEUE_FAMILY_IGNORED,
+        VK_QUEUE_FAMILY_IGNORED, m_instanceBuffers[m_currentFrame], 0,
+        VK_WHOLE_SIZE);
+    m_commandBuffer[m_currentFrame].pipelineBarrier(
+        vk::PipelineStageFlagBits::eTransfer,
+        vk::PipelineStageFlagBits::eVertexInput, {}, barrier, bufferBarrier,
+        {});
   }
-  void drawFrame(float* instanceData, uint32_t instanceCount = 1) {
-      m_device.waitForFences(1, &m_inFlightFences[m_currentFrame], VK_TRUE, UINT64_MAX);
-      m_device.resetFences(1, &m_inFlightFences[m_currentFrame]);
-      uint32_t imageIndex = m_device.acquireNextImageKHR(m_swapchain, UINT64_MAX, m_imageAvailableSemaphores[m_currentFrame]).value;
-      m_commandBuffer[m_currentFrame].begin({vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
-      uploadInstanceData(instanceData, instanceCount);
-      vk::ClearValue clearValue{};
-      clearValue.color = {0.0f, 0.0f, 0.0f, 1.0f};
-      vk::RenderPassBeginInfo renderPassBeginInfo{};
-      renderPassBeginInfo.clearValueCount = 1;
-      renderPassBeginInfo.pClearValues = &clearValue;
-      renderPassBeginInfo.framebuffer = m_framebuffers[imageIndex];
-      renderPassBeginInfo.renderArea = vk::Rect2D{{0,0}, {WIDTH, HEIGHT}};
-      renderPassBeginInfo.renderPass = m_renderPass;
-      m_commandBuffer[m_currentFrame].beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
-      m_commandBuffer[m_currentFrame].bindPipeline(vk::PipelineBindPoint::eGraphics, m_graphicsPipeline);
-      m_commandBuffer[m_currentFrame].bindVertexBuffers(0, {m_vertexBuffers[m_currentFrame], m_instanceBuffers[m_currentFrame]}, {0, 0});
-      m_commandBuffer[m_currentFrame].bindIndexBuffer(m_indexBuffers[m_currentFrame], 0, vk::IndexType::eUint32);
-      m_commandBuffer[m_currentFrame].drawIndexed(78, instanceCount, 0, 0, 0);
-      m_commandBuffer[m_currentFrame].endRenderPass();
-      m_commandBuffer[m_currentFrame].end();
-      vk::SubmitInfo submitInfo{};
-      submitInfo.commandBufferCount = 1;
-      submitInfo.pCommandBuffers = &m_commandBuffer[m_currentFrame];
-      submitInfo.signalSemaphoreCount = 1;
-      submitInfo.pSignalSemaphores = &m_renderFinishedSemaphores[m_currentFrame];
-      submitInfo.waitSemaphoreCount = 1;
-      submitInfo.pWaitSemaphores = &m_imageAvailableSemaphores[m_currentFrame];
-      vk::PipelineStageFlags waitStages[] = {vk::PipelineStageFlagBits::eColorAttachmentOutput};
-      submitInfo.pWaitDstStageMask = waitStages;
-      m_queue.submit(submitInfo, m_inFlightFences[m_currentFrame]);
-      vk::PresentInfoKHR presentInfo{};
-      presentInfo.waitSemaphoreCount = 1;
-      presentInfo.pWaitSemaphores = &m_renderFinishedSemaphores[m_currentFrame];
-      presentInfo.swapchainCount = 1;
-      presentInfo.pSwapchains = &m_swapchain;
-      presentInfo.pImageIndices = &imageIndex;
-      presentInfo.pResults = nullptr;
-      m_queue.presentKHR(presentInfo);
-      m_currentFrame = (m_currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
+  void drawFrame(float *instanceData, uint32_t instanceCount = 1) {
+    m_device.waitForFences(1, &m_inFlightFences[m_currentFrame], VK_TRUE,
+                           UINT64_MAX);
+    m_device.resetFences(1, &m_inFlightFences[m_currentFrame]);
+    uint32_t imageIndex =
+        m_device
+            .acquireNextImageKHR(m_swapchain, UINT64_MAX,
+                                 m_imageAvailableSemaphores[m_currentFrame])
+            .value;
+    m_commandBuffer[m_currentFrame].begin(
+        {vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
+    uploadInstanceData(instanceData, instanceCount);
+    vk::ClearValue clearValue{};
+    clearValue.color = {0.0f, 0.0f, 0.0f, 1.0f};
+    vk::RenderPassBeginInfo renderPassBeginInfo{};
+    renderPassBeginInfo.clearValueCount = 1;
+    renderPassBeginInfo.pClearValues = &clearValue;
+    renderPassBeginInfo.framebuffer = m_framebuffers[imageIndex];
+    renderPassBeginInfo.renderArea = vk::Rect2D{{0, 0}, {WIDTH, HEIGHT}};
+    renderPassBeginInfo.renderPass = m_renderPass;
+    m_commandBuffer[m_currentFrame].beginRenderPass(
+        renderPassBeginInfo, vk::SubpassContents::eInline);
+    m_commandBuffer[m_currentFrame].bindPipeline(
+        vk::PipelineBindPoint::eGraphics, m_graphicsPipeline);
+    m_commandBuffer[m_currentFrame].bindVertexBuffers(
+        0, {m_vertexBuffers[m_currentFrame], m_instanceBuffers[m_currentFrame]},
+        {0, 0});
+    m_commandBuffer[m_currentFrame].bindIndexBuffer(
+        m_indexBuffers[m_currentFrame], 0, vk::IndexType::eUint32);
+    m_commandBuffer[m_currentFrame].drawIndexed(78, instanceCount, 0, 0, 0);
+    m_commandBuffer[m_currentFrame].endRenderPass();
+    m_commandBuffer[m_currentFrame].end();
+    vk::SubmitInfo submitInfo{};
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &m_commandBuffer[m_currentFrame];
+    submitInfo.signalSemaphoreCount = 1;
+    submitInfo.pSignalSemaphores = &m_renderFinishedSemaphores[m_currentFrame];
+    submitInfo.waitSemaphoreCount = 1;
+    submitInfo.pWaitSemaphores = &m_imageAvailableSemaphores[m_currentFrame];
+    vk::PipelineStageFlags waitStages[] = {
+        vk::PipelineStageFlagBits::eColorAttachmentOutput};
+    submitInfo.pWaitDstStageMask = waitStages;
+    m_queue.submit(submitInfo, m_inFlightFences[m_currentFrame]);
+    vk::PresentInfoKHR presentInfo{};
+    presentInfo.waitSemaphoreCount = 1;
+    presentInfo.pWaitSemaphores = &m_renderFinishedSemaphores[m_currentFrame];
+    presentInfo.swapchainCount = 1;
+    presentInfo.pSwapchains = &m_swapchain;
+    presentInfo.pImageIndices = &imageIndex;
+    presentInfo.pResults = nullptr;
+    m_queue.presentKHR(presentInfo);
+    m_currentFrame = (m_currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
   };
 };
 
-class BouncingBall{
-    private:
-    const float GRAVITY = 0.5;
-    float m_vx;
-    float m_vy;
-    float m_instanceData[3];
-    std::chrono::time_point<std::chrono::high_resolution_clock> m_lastTime;
-    public:
-    BouncingBall(float x, float y, float vx, float vy, float radius){
-        m_instanceData[0] = x;
-        m_instanceData[1] = y;
-        m_instanceData[2] = radius;
-        m_vx = vx;
-        m_vy = vy;
-        m_lastTime = std::chrono::high_resolution_clock::now();
-    };
-    float* getInstanceData(){
-        return m_instanceData;
-    };
-    void update(){
-        auto currentTime = std::chrono::high_resolution_clock::now();
-        auto dt = std::chrono::duration<float>(currentTime - m_lastTime).count();
-        m_instanceData[0] += m_vx * dt;
-        m_instanceData[1] -= m_vy * dt;
-        m_vy -= GRAVITY * dt;
-        m_lastTime = currentTime;
-        if(m_instanceData[0] + m_instanceData[2] > 1.0){
-            m_vx = -m_vx;
-            m_instanceData[0] = 1.0 - m_instanceData[2];
-        }
-        if(m_instanceData[0] - m_instanceData[2] < -1.0){
-            m_vx = -m_vx;
-            m_instanceData[0] = -1.0 + m_instanceData[2];
-        }
-        if(m_instanceData[1] + m_instanceData[2] > 1.0){
-            m_vy = -m_vy;
-            m_instanceData[1] = 1.0 - m_instanceData[2];
-        }
-        if(m_instanceData[1] - m_instanceData[2] < -1.0){
-            m_vy = -m_vy;
-            m_instanceData[1] = -1.0 + m_instanceData[2];
-        }
-    };
+class BouncingBall {
+private:
+  const float GRAVITY = 0.5;
+  float m_vx;
+  float m_vy;
+  float m_instanceData[3];
+  std::chrono::time_point<std::chrono::high_resolution_clock> m_lastTime;
+
+public:
+  BouncingBall(float x, float y, float vx, float vy, float radius) {
+    m_instanceData[0] = x;
+    m_instanceData[1] = y;
+    m_instanceData[2] = radius;
+    m_vx = vx;
+    m_vy = vy;
+    m_lastTime = std::chrono::high_resolution_clock::now();
+  };
+  float *getInstanceData() { return m_instanceData; };
+  void update() {
+    auto currentTime = std::chrono::high_resolution_clock::now();
+    auto dt = std::chrono::duration<float>(currentTime - m_lastTime).count();
+    m_instanceData[0] += m_vx * dt;
+    m_instanceData[1] -= m_vy * dt;
+    m_vy -= GRAVITY * dt;
+    m_lastTime = currentTime;
+    if (m_instanceData[0] + m_instanceData[2] > 1.0) {
+      m_vx = -m_vx;
+      m_instanceData[0] = 1.0 - m_instanceData[2];
+    }
+    if (m_instanceData[0] - m_instanceData[2] < -1.0) {
+      m_vx = -m_vx;
+      m_instanceData[0] = -1.0 + m_instanceData[2];
+    }
+    if (m_instanceData[1] + m_instanceData[2] > 1.0) {
+      m_vy = -m_vy;
+      m_instanceData[1] = 1.0 - m_instanceData[2];
+    }
+    if (m_instanceData[1] - m_instanceData[2] < -1.0) {
+      m_vy = -m_vy;
+      m_instanceData[1] = -1.0 + m_instanceData[2];
+    }
+  };
 };
 
 int main() {
